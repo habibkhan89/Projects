@@ -1,0 +1,621 @@
+---
+title: "An analysis of COVID-19"
+author: "Habib Khan"
+date: "April 16, 2020"
+output: 
+  html_document:
+    toc: yes
+    toc_float: yes
+---
+
+# Introduction
+
+Pandemics are not new phenomena but it has kept coming in different time period since the beginning of civilization. Who had thought that we had to face a big pandemic after Spanish Flu in 1918. Although there were some epidemics such as Ebola but it was not as contagious as COVID-19 that appeared first in Wuhan, China in December 2019. This project aims to explore and visualize how COVID-19 has affected the world overall. The data has been taken from https://www.kaggle.com/sudalairajkumar/novel-corona-virus-2019-dataset. In this project, I will visualize how different countries has been affected by COVID-19 and what are the most appearing symptoms in the affected patients? 
+
+
+```{r, fig.width=25, fig.height=25, echo=FALSE}
+knitr::include_graphics('covid.png')
+```
+
+
+```{r, message=FALSE, warning=FALSE, echo=FALSE}
+# Loading the required libraries
+library(readr)
+library(tidyjson)
+library(tidyr)
+library(knitr)
+library(kableExtra)
+library(dplyr)
+library(stringr)
+library(ggplot2)
+library(scales)
+library(gganimate)
+library(lubridate)
+library(maps)
+library(ggthemes)
+library(DT)
+library(tm)
+library(wordcloud)
+#library(leaflet)
+#library(leaflet.extras)
+```
+
+
+
+# Data cleaning and exploration
+
+Data has been taken from John Hopkin's University and it is published in Kaggle in the given link. It has 9 csv files. I will be focusing on the datasets that fulfill my research questions. I have opened all the datasets for the data exploration purpose although. I will explore each dataset and clean as per my requirements.
+
+```{r, message=FALSE, warning=FALSE}
+# Reading all files together
+
+files <-list.files("C:/Users/hukha/Desktop/coronavirus dataset", "*.csv", full.names = TRUE)
+coronavirus_dataset <- sapply(files, read_csv, simplify = FALSE)  
+```
+
+
+The first dataset contains all the relevant data such as number of patients confirmed, died and recovered in different countries and in specific dates. Data was not given in proper tidy format and I had to change the dates into proper format to use them later. There were some missing values in the required columns which were dealt to avoid any biasness in analysis. I used DT package to show the data for exploration purpose.
+
+```{r, warning=FALSE, message=FALSE}
+# First dataset
+
+#Let's read the data structure first to see if there is any thing we can do to make the data tidy
+#head(coronavirus_dataset$`C:/Users/hukha/Desktop/coronavirus dataset/covid_19_data.csv`) %>% kable() %>% kable_styling() 
+#glimpse(coronavirus_dataset$`C:/Users/hukha/Desktop/coronavirus dataset/covid_19_data.csv`)
+
+
+# Converting the "ObservationDate" from character class into Date class
+coronavirus_dataset$`C:/Users/hukha/Desktop/coronavirus dataset/covid_19_data.csv` %>% head()
+
+coronavirus_dataset$`C:/Users/hukha/Desktop/coronavirus dataset/covid_19_data.csv`$ObservationDate <- as.Date(coronavirus_dataset$`C:/Users/hukha/Desktop/coronavirus dataset/covid_19_data.csv`$ObservationDate, format= "%m/%d/%Y")
+
+#coronavirus_dataset$`C:/Users/hukha/Desktop/coronavirus dataset/covid_19_data.csv`$`Last Update` <- as.Date(coronavirus_dataset$`C:/Users/hukha/Desktop/coronavirus dataset/covid_19_data.csv`$`Last Update`, format= "%m/%d/%y")
+
+# Looking for missing values
+colSums(is.na(coronavirus_dataset$`C:/Users/hukha/Desktop/coronavirus dataset/covid_19_data.csv`)) # Only State has missing values so we have to change                                                                                                     the missing values with "Unknown"
+
+# Replacing missing values for States
+
+coronavirus_dataset$`C:/Users/hukha/Desktop/coronavirus dataset/covid_19_data.csv`$`Province/State` <-  str_replace_na(coronavirus_dataset$`C:/Users/hukha/Desktop/coronavirus dataset/covid_19_data.csv`$`Province/State`, replacement= "Unknown")
+
+# Creating copy of file locally
+
+covid_19_data <- coronavirus_dataset$`C:/Users/hukha/Desktop/coronavirus dataset/covid_19_data.csv`
+#sample_n(covid_19_data, 10) %>% kable() %>% kable_styling()
+#covid_19_data %>% datatable
+```
+
+
+```{r, message=FALSE, warning=FALSE, eval=FALSE, echo=FALSE}
+# Second dataset
+
+# Viewing the data structure
+#glimpse(coronavirus_dataset$`C:/Users/hukha/Desktop/coronavirus dataset/COVID19_line_list_data.csv`)
+
+
+# Remove unnecessary columns from dataset
+
+coronavirus_dataset$`C:/Users/hukha/Desktop/coronavirus dataset/COVID19_line_list_data.csv` <- select(coronavirus_dataset$`C:/Users/hukha/Desktop/coronavirus dataset/COVID19_line_list_data.csv`, -c(source, X4, link, X22, X23, X24, X25, X26, X27))
+
+# Converting Dates from string 
+coronavirus_dataset$`C:/Users/hukha/Desktop/coronavirus dataset/COVID19_line_list_data.csv`$`reporting date` <- as.Date(coronavirus_dataset$`C:/Users/hukha/Desktop/coronavirus dataset/COVID19_line_list_data.csv`$`reporting date`, format= "%m/%d/%Y")
+
+coronavirus_dataset$`C:/Users/hukha/Desktop/coronavirus dataset/COVID19_line_list_data.csv`$symptom_onset <- as.Date(coronavirus_dataset$`C:/Users/hukha/Desktop/coronavirus dataset/COVID19_line_list_data.csv`$symptom_onset, format= "%m/%d/%y")
+
+coronavirus_dataset$`C:/Users/hukha/Desktop/coronavirus dataset/COVID19_line_list_data.csv`$exposure_start <- as.Date(coronavirus_dataset$`C:/Users/hukha/Desktop/coronavirus dataset/COVID19_line_list_data.csv`$exposure_start, format= "%m/%d/%y")
+
+coronavirus_dataset$`C:/Users/hukha/Desktop/coronavirus dataset/COVID19_line_list_data.csv`$exposure_end <- as.Date(coronavirus_dataset$`C:/Users/hukha/Desktop/coronavirus dataset/COVID19_line_list_data.csv`$exposure_end, format= "%m/%d/%y")
+
+# Checking for missing values
+colSums(is.na(coronavirus_dataset$`C:/Users/hukha/Desktop/coronavirus dataset/COVID19_line_list_data.csv`))
+
+# Replacing missing values with NA - Characters
+#selCols <- c("country", "gender", "location")
+
+#coronavirus_dataset$`C:/Users/hukha/Desktop/coronavirus dataset/COVID19_line_list_data.csv`[selCols] <- sapply(coronavirus_dataset$`C:/Users/hukha/Desktop/coronavirus dataset/COVID19_line_list_data.csv`[selCols], function(x) str_replace_na(coronavirus_dataset$`C:/Users/hukha/Desktop/coronavirus dataset/COVID19_line_list_data.csv`[selCols], replacement= "Unknown"))
+
+#glimpse(coronavirus_dataset$`C:/Users/hukha/Desktop/coronavirus dataset/COVID19_line_list_data.csv`)
+# Replacing missing values with NA - Integers
+selNums <- c("death", "recovered", "case_in_country")
+coronavirus_dataset$`C:/Users/hukha/Desktop/coronavirus dataset/COVID19_line_list_data.csv`[selNums] <- lapply(coronavirus_dataset$`C:/Users/hukha/Desktop/coronavirus dataset/COVID19_line_list_data.csv`[selNums], function(x) as.integer(!is.na(0)))
+
+# Creating local copy of file
+COVID19_line_list_data <- coronavirus_dataset$`C:/Users/hukha/Desktop/coronavirus dataset/COVID19_line_list_data.csv`
+sample_n(COVID19_line_list_data, 5) %>% kable() %>% kable_styling()
+```
+
+The next dataset contains the confirmed patients throughout the world along the longitude and latitude which would be required to plot the data on the map. There were no missing values in this dataset but data was present in wide format and I had to use tidyr's gather function to convert the data into long format. I have printed few random rows from the data for exploration purpose. I went through next datasets which are covid19_deaths and covid19_recovered which had the same issues. They all are now tidy and clean. 
+
+```{r, message=FALSE, warning=FALSE}
+# Confirmed Patients' Dataset
+#glimpse(coronavirus_dataset$`C:/Users/hukha/Desktop/coronavirus dataset/time_series_covid_19_confirmed.csv`)
+
+## Checking for missing values
+#colSums(is.na(coronavirus_dataset$`C:/Users/hukha/Desktop/coronavirus dataset/time_series_covid_19_confirmed.csv`))
+
+## Replacing missing values
+coronavirus_dataset$`C:/Users/hukha/Desktop/coronavirus dataset/time_series_covid_19_confirmed.csv`$`Province/State` <-str_replace_na( coronavirus_dataset$`C:/Users/hukha/Desktop/coronavirus dataset/time_series_covid_19_confirmed.csv`$`Province/State`, replacement= "Unknown")
+
+# Tidying the data by converting into long format and creating a copy
+covid19_confirmed <- coronavirus_dataset$`C:/Users/hukha/Desktop/coronavirus dataset/time_series_covid_19_confirmed.csv` %>% gather(Date,
+                             Confirmed_Cases, -c(`Province/State`, `Country/Region`, Long, Lat))
+
+
+# Checking for missing values
+colSums(is.na(covid19_confirmed))
+
+# Converting Date column into Date 
+covid19_confirmed$Date <- as.Date(covid19_confirmed$Date, format="%m/%d/%y") 
+
+#glimpse(covid19_confirmed)
+sample_n(covid19_confirmed, 10) %>% kable() %>% kable_styling()
+```
+
+
+```{r, message=FALSE, warning=FALSE}
+# Dataset - Deaths globally
+
+#glimpse(coronavirus_dataset$`C:/Users/hukha/Desktop/coronavirus dataset/time_series_covid_19_deaths.csv`)
+
+# Creating local file
+covid19_deaths <- coronavirus_dataset$`C:/Users/hukha/Desktop/coronavirus dataset/time_series_covid_19_deaths.csv`
+
+# Tidying the data; converting from wide to long
+covid19_deaths <- covid19_deaths %>% gather(Date, Deaths, -c(`Province/State`, `Country/Region`, Lat, Long))
+
+# Converting the data type into date
+covid19_deaths$Date <- as.Date(covid19_deaths$Date, format="%m/%d/%y")
+
+# replacing missing values
+covid19_deaths$`Province/State` <- str_replace_na(covid19_deaths$`Province/State`, replacement="Unknown")
+
+# Checking for structure and missing values
+#glimpse(covid19_deaths)
+#colSums(is.na(covid19_deaths))
+sample_n(covid19_deaths, 10) %>% kable() %>% kable_styling()
+```
+
+
+```{r, message=FALSE, warning=FALSE}
+# Dataset - Recovered Patients
+
+# creating local file
+covid19_recovered <- coronavirus_dataset$`C:/Users/hukha/Desktop/coronavirus dataset/time_series_covid_19_recovered.csv`
+
+# Tidying the data
+covid19_recovered <- covid19_recovered %>% gather(Date, Recovered, -c(`Province/State`, `Country/Region`, Lat, Long))
+
+# Data cleaning
+covid19_recovered$Date <- as.Date(covid19_recovered$Date, format= "%m/%d/%y")
+colSums(is.na(covid19_recovered))
+
+# replacing missing values
+covid19_recovered$`Province/State` <- str_replace_na(covid19_recovered$`Province/State`, replacement="Unknown")
+
+# Checking
+glimpse(covid19_recovered)
+colSums(is.na(covid19_recovered))
+sample_n(covid19_recovered, 10) %>% kable() %>% kable_styling()
+```
+
+The below dataset is still dirty although but I need only column "symptoms" from this dataset for text mining analysis. I will do the necessary cleaning while conducting analysis. 
+
+```{r, warning=FALSE, message=FALSE}
+# Dataset for symptoms
+covid19_updated <- coronavirus_dataset$`C:/Users/hukha/Desktop/coronavirus dataset/COVID19_open_line_list.csv` 
+```
+
+# Data Visualization
+
+In this section, I will be exploring the data through visualizing them. 
+
+## COVID-19' Growing trend over time
+
+COVID-19 is spreading very quickly. According to John Hopkin's University, it is 2 % contagious while Spanish Flu which killed millions of people globally was 1.8 % contagious. Since the beginning of pandemic up to 5th May 2020, almost 4 million people has got Corona Virus throughout the world. Unfortunately, mortality rate for COVID-19 is 4.5% whileas Spanish Flu had mortality rate of 2.5%. Apparently from the source, we can see that it is spreading very quickly throughout the world and so far it has killed almost 250,000 people. Around 500,000 people have recovered globally. 
+
+The article was taken from https://www.cnbc.com/2020/03/26/coronavirus-may-be-deadlier-than-1918-flu-heres-how-it-stacks-up-to-other-pandemics.html.
+
+```{r, warning=FALSE, message=FALSE}
+# Creating line plot to see how coronavirus affected
+covid_19_data %>% 
+  gather(Type,
+         Freq2,
+         -c(SNo, ObservationDate, `Province/State`, `Country/Region`, `Last Update`)) %>% 
+  select(ObservationDate, Type, Freq2) %>% 
+  group_by(ObservationDate, Type) %>% 
+  summarise(n= sum(Freq2)) %>% 
+  ggplot()+geom_line(aes(ObservationDate,n, color=Type),size=1)+theme_classic()+theme_update(plot.title= element_text(hjust=0.5)) +labs(title= "Covid-19 growth trend over time",x="Months", y="Frequency")+ scale_y_continuous(labels = comma)
+
+```
+
+## Confirmed cases
+
+COVID-19 was started initially from Wuhan, China but they managed to reduce confirmed cases and unfortunately US is a leading country that has the most number of cases as of May 10, 2020 with around 1.3 million with Spain, UK and Italy having second, third and forth countries respectively with highest confirmed cases.
+
+```{r, warning=FALSE, message=FALSE}
+covid_19_data %>% 
+  filter(`ObservationDate` == max(`ObservationDate`)) %>% 
+  group_by(`Country/Region`) %>% 
+  summarise(n = sum(Confirmed)) %>% 
+  arrange(desc(n)) %>%
+  head(n=20) %>% 
+  ggplot() +geom_bar(aes(x=reorder(`Country/Region`, n),y= n), stat="identity",fill="steelblue", width=0.9)+scale_y_continuous(label=comma)+
+  labs(title="Countries with Top COVID-19 Confirmed Cases", x="Countries", y="Confirmed Cases")+geom_text(aes(`Country/Region`,n, label=n), hjust= -0.1, size=3, color="black", inherit.aes = TRUE, position = position_dodge(width=0.7))+ theme_classic()+theme_update(plot.title= element_text(hjust=0.5))+coord_flip()
+```
+
+
+```{r, message=FALSE, warning=FALSE}
+# Creating map for confirmed cases
+covid19_confirmed %>% 
+  filter(Date == max(Date)) %>% 
+  ggplot()+
+  borders("world",color="gray85", fill="gray80", resolution=0.1)+
+  theme_map(base_size = 15)+
+  geom_point(aes(x=Long, y=Lat, size=Confirmed_Cases),
+             color='purple', alpha=.5)+
+  scale_size_continuous(range=c(1,8),
+                        #breaks=c(50000,100000,150000,200000,250000,300000),
+                        label= comma)+
+  labs(size="Confirmed_Cases", title="Confirmed Cases of COVID-19")+
+  theme_classic()+theme_update(plot.title= element_text(hjust=0.5))
+
+
+# Animated map
+anime_confirmed <- covid19_confirmed %>% 
+  mutate(Week = week(Date)) %>% 
+  group_by(`Country/Region`, Week) %>% 
+  ggplot()+
+  borders("world",color="gray85", fill="gray80", resolution=0.1)+
+  theme_map(base_size = 15)+
+  geom_point(aes(x=Long, y=Lat, size=Confirmed_Cases),
+             color='purple', alpha=.5)+
+  scale_size_continuous(range=c(1,8),
+                        #breaks=c(50000,100000,150000,200000,250000,300000),
+                        label= comma)+
+  labs(size="Confirmed_Cases", title="Confirmed Cases of COVID-19")+
+  theme_classic()+theme_update(plot.title= element_text(hjust=0.5))+
+  labs(subtitle="Week: {frame_time}")+
+  transition_time(Week)+
+  shadow_wake(wake_length = 0.1)
+anime_confirmed
+```
+
+## Deaths
+
+US has highest number of deaths so far with almost 80,000 people with UK having almost 32000 and Italy having 30500 deaths. Spain and France also have around 26,000 deaths so far as of May 5, 2020.  
+ 
+```{r, message=FALSE, warning=FALSE}
+covid_19_data %>% 
+  filter(`ObservationDate` == max(`ObservationDate`)) %>% 
+  group_by(`Country/Region`) %>% 
+  summarise(n = sum(Deaths)) %>% 
+  arrange(desc(n)) %>%
+  head(n=20) %>% 
+  ggplot() +geom_bar(aes(x=reorder(`Country/Region`, n),y= n), stat="identity",fill="darkred", width=0.9)+scale_y_continuous(label=comma)+
+  labs(title="Countries with Top COVID-19 Death Cases", x="Countries", y="Deaths")+geom_text(aes(`Country/Region`,n, label=n), hjust= -0.1, size=3, color="black", inherit.aes = TRUE, position = position_dodge(width=0.7))+ theme_classic()+theme_update(plot.title= element_text(hjust=0.5))+coord_flip()
+```
+
+```{r, message=FALSE, warning=FALSE}
+# Creating map for deaths
+covid19_deaths %>% 
+  filter(Date == max(Date)) %>% 
+  ggplot()+
+  borders("world",color="gray85", fill="gray80", resolution=0.1)+
+  theme_map(base_size = 15)+
+  geom_point(aes(x=Long, y=Lat, size=Deaths),
+             color='Darkred', alpha=.5)+
+  scale_size_continuous(label= comma)+
+  labs(size="Deaths", title="Deaths")+
+  theme_bw()+theme_update(plot.title= element_text(hjust=0.5))
+
+
+# Animated map for deaths
+
+# anime_deaths <-  covid19_deaths %>% 
+#    mutate(Week= week(Date)) %>% 
+#    group_by(`Country/Region`, Week) %>% 
+#    ggplot()+
+#    borders("world",color="gray85", fill="gray80", resolution=0.1)+
+#    theme_map(base_size = 15)+
+#    geom_point(aes(x=Long, y=Lat, size=Deaths),
+#               color='Darkred', alpha=.5)+
+#    scale_size_continuous(label= comma)+
+#    labs(size="Deaths", title="Deaths")+
+#    theme_bw()+theme_update(plot.title= element_text(hjust=0.5))+
+#    labs(subtitle="Week: {frame_time}")+
+#    transition_time(Week)+
+#    shadow_wake(wake_length = 0.1)
+#anime_deaths
+```
+
+## Recovered cases
+
+Fortunately, a lot of COVID-19 patients are being recovered without any significant damage and some of them don't even have symtoms. US has the highest number of recovered patients which is almost 210,000, Germany with 144,000 and Spain with 136,666 patients who recovered. 
+
+```{r, message=FALSE, warning=FALSE}
+covid_19_data %>% 
+  filter(`ObservationDate` == max(`ObservationDate`)) %>% 
+  group_by(`Country/Region`) %>% 
+  summarise(n = sum(Recovered)) %>% 
+  arrange(desc(n)) %>%
+  head(n=20) %>% 
+  ggplot() +geom_bar(aes(x=reorder(`Country/Region`, n),y= n), stat="identity",fill="darkgreen", width=0.9)+scale_y_continuous(label=comma)+
+  labs(title="Countries with Top COVID-19 Recovered Cases", x="Countries", y="Confirmed Cases")+geom_text(aes(`Country/Region`,n, label=n), hjust= -0.1, size=3, color="black", inherit.aes = TRUE, position = position_dodge(width=0.7))+ theme_classic()+theme_update(plot.title= element_text(hjust=0.5))+coord_flip()
+```
+
+
+
+```{r, message=FALSE, warning=FALSE}
+# Creating map for recovered cases
+covid19_recovered %>% 
+  filter(Date == max(Date)) %>% 
+  ggplot()+
+  borders("world",color="gray85", fill="gray80", resolution=0.1)+
+  theme_map(base_size = 15)+
+  geom_point(aes(x=Long, y=Lat, size=Recovered),
+             color='DarkGreen', alpha=.5)+
+  scale_size_continuous(label= comma)+
+  labs(size="Recovered", title="Recovered cases of COVID-19")+
+  theme_bw()+theme_update(plot.title= element_text(hjust=0.5))
+
+# Creating animated maps
+# anime_recovered <- covid19_recovered %>% 
+#    mutate(Week= week(Date)) %>% 
+#    group_by(`Country/Region`, Week) %>% 
+#    ggplot()+
+#    borders("world",color="gray85", fill="gray80", resolution=0.1)+
+#    theme_map(base_size = 15)+
+#    geom_point(aes(x=Long, y=Lat, size=Recovered),
+#               color='DarkGreen', alpha=.5)+
+#    scale_size_continuous(label= comma)+
+#    labs(size="Recovered", title="Recovered cases of COVID-19")+
+#    theme_bw()+theme_update(plot.title= element_text(hjust=0.5))+
+#    labs(subtitle="Week: {frame_time}")+
+#    transition_time(Week)+
+#    shadow_wake(wake_length = 0.1)
+# anime_recovered
+```
+
+
+
+```{r, eval=FALSE}
+#glimpse(covid19_updated)
+covid19_updated %>% 
+  mutate(sex = str_replace_all(sex, c("female" = "Female", "male" = "Male"))) %>% 
+  group_by(sex) %>% 
+  drop_na(sex) %>%
+  filter(!sex %in% c("4000", "N/A")) %>% 
+  count() %>% 
+  ggplot()+ geom_bar(aes(reorder(sex, n), n), stat="identity")
+
+covid19_updated %>% 
+  mutate(sex = str_replace_all(sex, c("female" = "Female", "male" = "Male"))) %>% 
+  age <- as.integer(age) %>% 
+  mutate(age2 = if_else(age <= 9, "0 - 9", if_else(age >=10 & age <= 19, "10 - 19", age))) %>% 
+  group_by(sex, age) %>% 
+  drop_na(sex, age) %>%
+  filter(!sex %in% c("4000", "N/A")) %>% 
+  head(n=25)
+  count() #%>% 
+  
+ggplot()+ geom_bar(aes(reorder(sex, n), n), stat="identity")
+
+```
+
+
+# Symptoms
+
+One of the datasets contained information about the symptoms some of the patients had. Although the data a lot of missing values but out of that data, I used text mining techniques to visualize the frequently appearing symptoms in COVID-19 patients. I used tm package to clean the data and converted symptoms into matrix in order to use word cloud. Result indicates that majority of COVID-19 patients had fever, cough and sore threat. Some of the patients caught pneumonia, headache and chills as well.  
+
+```{r, message=FALSE, warning=FALSE}
+# Text mining 
+symptoms <- covid19_updated$symptoms
+
+words <- Corpus(VectorSource(symptoms))
+words <- tm_map(words, removeNumbers)
+words <- tm_map(words, removePunctuation)
+words <- tm_map(words, stripWhitespace)
+words <- tm_map(words, removeWords, stopwords("english"))
+#words <- tm_map(words,removeWords, c(""))
+head(words)
+
+tdm <- TermDocumentMatrix((words))
+m <- as.matrix(tdm)
+v <- sort(rowSums(m), decreasing=TRUE)
+d <- data.frame(word= names(v), freq=v)
+head(d,50, row.names=FALSE) %>% kable() %>% kable_styling()
+
+# wordcloud
+
+set.seed(1235)
+wordcloud(words = d$word, freq = d$freq, min.freq = 1,
+          random.order=FALSE, rot.per=0.35, 
+          colors=brewer.pal(8, "Dark2"), width=1200, height=800)
+
+# Creating bar chart to see mostly appeared symptoms in COVID 19 patients
+ggplot(head(d,30), aes(reorder(word, freq), freq))+geom_bar(stat="identity", fill="DarkRed",width = 0.9)+coord_flip()+labs(title="Mostly appearing symptoms in COVID-19 patients", x="Symptoms", y="Frequency")+theme_classic()
+```
+
+# Conclusion
+
+COVID-19 was started in December 2019 in Wuhuan, China and later it became pandemic and spread throughout the world. Initially, China and Italy were the most hitted countries but later United States became apicentre with huge number of confirmed cases, deaths and recovered cases. Data also shows that most of the patients have fever, cough, sore threat with some showing pneumonia and chills. The dashboard has also made that shows the summary of this project. Link is given below.
+
+# Appendix
+
+https://hkhan10.shinyapps.io/corona/
+
+```{r, eval=FALSE, message=FALSE, warning=FALSE}
+
+library(shiny)
+library(shinydashboard)
+library(tidyr)
+library(dplyr)
+library(ggplot2)
+library(scales)
+library(ggthemes)
+library(readr)
+library(knitr)
+library(shinythemes)
+library(lubridate)
+library(maps)
+library(tm)
+library(wordcloud)
+library(plotly)
+
+# importing data
+
+# Reading all files together
+covid_19_data <- read_csv("covid_main_data.csv") %>% select(-c(X1))
+covid19_confirmed <- read_csv("covid19_confirmed.csv")
+covid19_updated <- read_csv("covid19_updated.csv")
+
+# creating line graph
+trend <- 
+  covid_19_data %>% 
+  gather(Type,
+         Freq2,
+         -c(SNo, ObservationDate, `Province/State`, `Country/Region`, `Last Update`)) %>% 
+  select(ObservationDate, Type, Freq2) %>% 
+  group_by(ObservationDate, Type) %>% 
+  summarise(n= sum(Freq2)) %>% 
+  ggplot()+geom_line(aes(ObservationDate,n, color=Type),size=1)+scale_y_continuous(labels = comma)+labs(title="COVID-19 Growth Trend",x="Date", y="Frequency")
+
+# creating map
+map_confirmed <-
+  covid19_confirmed %>% 
+  filter(Date == max(Date)) %>% 
+  ggplot()+
+  borders("world",color="gray85", fill="gray80", resolution=0.1)+
+  theme_map(base_size = 15)+
+  geom_point(aes(x=Long, y=Lat, size=Confirmed_Cases),
+             color='purple', alpha=.5)+
+  scale_size_continuous(range=c(1,8),
+                        #breaks=c(50000,100000,150000,200000,250000,300000),
+                        label= comma)+
+  labs(size="Confirmed_Cases", title="Confirmed Cases of COVID-19")+
+  theme_classic()+theme_update(plot.title= element_text(hjust=0.5))
+  
+# Info Boxes
+
+confirmed_cases <- covid_19_data %>% 
+  filter(ObservationDate == max(ObservationDate)) %>% 
+  summarise(n= sum(Confirmed)) %>% 
+  head()
+
+
+death_cases <- covid_19_data %>% 
+  filter(ObservationDate == max(ObservationDate)) %>% 
+  summarise(n = sum(Deaths)) %>% 
+  head()
+
+
+recovered_cases <- covid_19_data %>% 
+  filter(ObservationDate == max(ObservationDate)) %>% 
+  summarise(n = sum(Recovered)) %>% 
+  head()
+
+
+
+# Define UI 
+
+
+header <- dashboardHeader(title="COVID-19 Daily Tracker", titleWidth = 450)
+
+
+
+sidebar <- dashboardSidebar(
+  sidebarMenu(
+    
+    menuItem("Dashboard", tabName= "dashboard_covid"),
+    #menuItem("Symptoms", tabName="Symptoms1"),
+    menuItem("Data", tabName = "Dataa"),
+    menuItem("Appendix", tabName = "Appendixx")
+  )
+)
+
+
+
+
+
+body <- dashboardBody(
+  tabItems(
+    tabItem(tabName= "dashboard_covid",
+            # Creating linegraph
+            fluidRow(
+              infoBox("Confirmed Cases", prettyNum(confirmed_cases, big.mark = ","), color="maroon", icon= icon("hospital"), width=3),
+              infoBox("Deaths", prettyNum(death_cases, big.mark = ","), color="red", icon= icon("exclamation"),width=3),
+              infoBox("Recovered cases",prettyNum(recovered_cases, big.mark=","), color="green", icon = icon("check"),width=3),
+              infoBox("Mortality Rate", (round(death_cases/confirmed_cases, 5)* 100) , width = 3, icon= icon("percent"))
+            ),
+            
+            
+            
+            fluidRow(
+              box(plotOutput("lineplot"),
+                  dateRangeInput("Date1", label="Select the date range", start= min(covid_19_data$ObservationDate, end = max(covid_19_data$ObservationDate)))),
+              box(plotOutput("map1"))
+             )
+        ),
+   
+    
+    tabItem(tabName="Appendixx",
+            h2("Reference"),
+            h3("https://www.kaggle.com/sudalairajkumar/undefined"),
+            h3("https://www.tableau.com/covid-19-coronavirus-data-resources"),
+            h3("https://www.youtube.com/watch?v=KdvlxJaWWVQ&list=PLYUFHoLnVxnSrc_tcaXx85CN6J68EAtaR&index=2")),
+   
+    
+    tabItem(tabName="Dataa",
+            box(title= "COVID-19 world dataset (random data)", solidHeader = TRUE, tableOutput("DataSummary")))
+    )
+)
+
+
+# Running UI
+ui <- dashboardPage(header, sidebar, body )
+
+
+# Server
+
+server <- function(input,output){
+  output$lineplot <- renderPlot({
+    trend + scale_x_date(limits= input$Date1)
+  })
+ 
+  output$map1 <- renderPlot({
+    map_confirmed 
+   }) 
+ 
+  output$DataSummary <- renderTable({sample_n(covid_19_data,size=10) })
+  
+  output$symptoms_w <- renderPlot({
+    symptoms <- covid19_updated$symptoms
+    
+    words <- Corpus(VectorSource(symptoms))
+    words <- tm_map(words, removeNumbers)
+    words <- tm_map(words, removePunctuation)
+    words <- tm_map(words, stripWhitespace)
+    words <- tm_map(words, removeWords, stopwords("english"))
+    #words <- tm_map(words,removeWords, c(""))
+    head(words)
+    
+    tdm <- TermDocumentMatrix((words))
+    m <- as.matrix(tdm)
+    v <- sort(rowSums(m), decreasing=TRUE)
+    d <- data.frame(word= names(v), freq=v)
+    #head(d,50, row.names=FALSE) %>% kable() %>% kable_styling()
+    
+    # wordcloud
+    wordcloud(words = d$word, freq = d$freq, min.freq = 1,
+                        random.order=FALSE, rot.per=0.35, 
+                        colors=brewer.pal(8, "Dark2"))
+  })
+  
+}
+
+# Run the application 
+shinyApp(ui = ui, server = server)
+
+
+```
+
