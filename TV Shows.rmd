@@ -1,0 +1,78 @@
+---
+title: "TV Shows"
+author: "Habib Khan"
+date: "May 31, 2020"
+output: html_document
+---
+
+# Inspiration
+
+
+1- Which streaming platform(s) can I find this tv show on? <br>
+2- IMDb ratings of a tv show? <br>
+3- Target age group tv shows vs the streaming application they can be found on <br>
+4- The year during which a tv show was produced and the streaming platform they can be found on <br>
+
+```{r, message=FALSE, warning=FALSE, echo=FALSE}
+library(knitr)
+library(stringr)
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+library(readr)
+library(kableExtra)
+library(DT)
+```
+
+```{r, message=FALSE, warning=FALSE}
+# Reading the dataset
+tvshows <- read_csv("C:/Users/hukha/Desktop/MS - Data Science/Python Datacamp/tv_shows.csv", col_names = TRUE) %>% select(-c(type))
+
+# Changing improper name
+colnames(tvshows) <- str_replace(colnames(tvshows), "X1", "ID")
+
+# Head
+head(tvshows) %>% DT::datatable()
+```
+
+```{r}
+# Cleaning data
+
+## Extracting % from Rotten tomatoes
+tvshows$`Rotten Tomatoes` <- str_extract(tvshows$`Rotten Tomatoes`, pattern = "\\d+") %>%  str_replace_na(replacement = 0) %>% as.numeric()
+tvshows$IMDb <- str_replace_na(tvshows$IMDb, replacement = 0) %>% as.numeric()
+
+## Factors
+tvshows$Age <- as.factor(tvshows$Age)
+
+# Trimming
+tvshows$Title <- str_trim(tvshows$Title, side=c("both", "left", "right"))
+```
+
+```{r}
+# Visualizing frequency of TV shows
+
+tvshows %>% select(Netflix, `Prime Video`, Hulu, `Disney+`) %>% gather(key="Media_Service_Provider", value="TV shows") %>% group_by(`Media_Service_Provider`) %>% summarise(`Freq` = sum(`TV shows`)) %>% arrange(Freq) %>% ggplot()+geom_bar(aes(reorder(x=Media_Service_Provider, Freq), y=Freq), stat="identity",fill="steelblue") + labs(title ="Number of TV Shows by Media Service Providers", x="Number of TV Shows", y="Media Service Providers") + geom_text(aes(`Media_Service_Provider`,Freq, label=Freq),vjust=-0.3) + theme_update(plot.title= element_text(hjust=0.5)) + theme_classic()
+```
+
+# Which shows are popular in Netflix?
+
+```{r}
+tvshows %>% filter(Netflix == 1) %>%  select(`Title`, Year, IMDb, `Rotten Tomatoes`) %>% arrange(desc(IMDb, `Rotten Tomatoes`)) %>%  head(30) %>% 
+  ggplot()+geom_bar(aes(reorder(`Title`, `IMDb`), IMDb), stat="identity", fill="steelblue") + labs(Title="Highly Rated TV Shows by IMDb in Netflix", y="IMDb Ratings", x="TV Shows")+ coord_flip() + geom_text(aes(`Title`, `IMDb`,label=`IMDb`),hjust=-0.3, size=3) + theme_update(plot.title= element_text(hjust=0.5)) + theme_classic() 
+
+tvshows %>% filter(Netflix == 1) %>%  select(`Title`, Year,`Rotten Tomatoes`) %>% arrange(desc(`Rotten Tomatoes`)) %>%  head(30) %>% 
+  ggplot()+geom_bar(aes(reorder(`Title`, `Rotten Tomatoes`), `Rotten Tomatoes`), stat="identity", fill="darkred") + labs(Title="Highly Rated TV Shows by Rotten Tomatoes in Netflix", y="Rotten Tomatoes Ratings", x="TV Shows") + coord_flip()+ geom_text(aes(`Title`, `Rotten Tomatoes`,label=`Rotten Tomatoes`),hjust=-0.3, size=3) + theme_update(plot.title= element_text(hjust=0.5)) + theme_classic() 
+```
+
+
+# Popular shows in Prime?
+
+```{r}
+tvshows %>% filter(`Prime Video` == 1) %>%  select(`Title`, Year, IMDb, `Rotten Tomatoes`) %>% arrange(desc(IMDb, `Rotten Tomatoes`)) %>%  head(30) %>% 
+  ggplot()+geom_bar(aes(reorder(`Title`, `IMDb`), IMDb), stat="identity", fill="steelblue") + labs(Title="Highly Rated TV Shows by IMDb in Netflix", y="IMDb Ratings", x="TV Shows in Prime Video")+ coord_flip() + geom_text(aes(`Title`, `IMDb`,label=`IMDb`),hjust=-0.3, size=3) + theme_update(plot.title= element_text(hjust=0.5)) + theme_classic() 
+
+tvshows %>% filter(`Prime Video` == 1) %>%  select(`Title`, Year,`Rotten Tomatoes`) %>% arrange(desc(`Rotten Tomatoes`)) %>% mutate(`Title` = if_else(`Title`== "When the Levees Broke: A Requiem in Four Acts", "When the Levees Broke", `Title`)) %>%  head(30) %>%  
+  ggplot()+geom_bar(aes(reorder(`Title`, `Rotten Tomatoes`), `Rotten Tomatoes`), stat="identity", fill="darkred") + labs(Title="Highly Rated TV Shows by Rotten Tomatoes in Netflix", y="Rotten Tomatoes Ratings", x="TV Shows") + coord_flip()+ geom_text(aes(`Title`, `Rotten Tomatoes`,label=`Rotten Tomatoes`),hjust=-0.1, size=3) + theme_update(plot.title= element_text(hjust=0.5)) + theme_classic()
+```
+
